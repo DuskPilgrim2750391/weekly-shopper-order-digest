@@ -1,0 +1,19 @@
+{
+  "name": "weekly-shopper-digest",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --experimental-strip-types src/digest_service.ts",
+    "schedule": "node --experimental-strip-types src/schedule_digest.ts",
+    "test": "node --experimental-strip-types --test test/digest_builder.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "typescript": "^5.8.2"
+  }
+}
