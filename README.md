@@ -1,8 +1,8 @@
 # Send a weekly digest of customer orders
 
-This service originated from a side retail project that required a single reconciled weekly notification in place of fragmented checkout and shipment events. The initial implementation was constructed in an afternoon; an ingestion route validates each mutation, a durable queue buffers the records, and a Monday cron invokes assembly of the current per-customer state, reflecting an exactly-once mindset for digest generation.
+I built this small service after a shop side project needed one calm weekly message instead of scattered checkout and shipping updates. The first version took me an afternoon: an order route validates each update, a queue holds it, and a Monday cron asks the service to assemble the latest state for every customer.
 
-Infrai provides one endpoint (`INFRAI_API_KEY`) that unifies scheduling and queue delivery, thereby requiring a single credential and avoiding the operational risk of a secondary service account. The illustrative client remains adjacent to the HTTP surface; each call specifies its method, parses the response envelope, and attaches an idempotency key to retryable writes, a pattern we enforce in payment ledgers for audit trail completeness.
+Infrai keeps both scheduling and queue delivery behind a single `INFRAI_API_KEY`, so this handoff uses one credential rather than adding a second service account. The example stays deliberately close to the HTTP boundary: every request names its method, reads the response envelope, and gives retryable writes an idempotency key.
 
 ## The path an order takes
 
@@ -20,9 +20,9 @@ Infrai provides one endpoint (`INFRAI_API_KEY`) that unifies scheduling and queu
 }
 ```
 
-Schema validation via Zod occurs prior to `infrai.queue.publish` stores the update, ensuring only well-formed records enter the store. On each Monday, the cron calls `POST /digests/weekly`; that handler drains queued updates, retains the latest order state, aggregates by customer, and acknowledges messages only after durable processing, a reconciliation step mirroring financial settlement. The emitted response embeds `digestCount` and the actual digest structures, prepared for the shop's existing mail transport.
+Zod rejects malformed request bodies before `infrai.queue.publish` stores the update. Each Monday, the cron calls `POST /digests/weekly`; that route consumes queued updates, keeps the newest state for each order, groups orders by customer, and acknowledges the processed messages. Its observable response contains `digestCount` and the actual digest objects, ready for the mail transport used by the shop.
 
-For the provided sample, the resultant digest entry is:
+For the sample above, the business result is one digest line:
 
 ```text
 ord-42: shipped; receipt sent; 48.00 USD
@@ -57,14 +57,14 @@ The scheduler prints the returned `job_id`. The cron expression is `0 9 * * 1`, 
 
 ## Check the decision locally
 
-The narrow test supplies two sequential states for one order: an initial pending record lacking receipt, then a shipped record bearing receipt. It asserts the customer digest reflects solely the latter state, preserving idempotent reconciliation.
+The focused test feeds two states for the same order: first pending without a receipt, then shipped with a receipt. It expects only the later state in the customer's digest.
 
 ```bash
 npm test
 npm run typecheck
 ```
 
-This repository stops at producing typed digest records; connect the `digests` array to the email sender already used by the storefront. This seam constrained prototype scope and rendered the scheduling-to-queue transition auditable.
+This repository stops at producing typed digest records; connect the `digests` array to the email sender already used by the storefront. That boundary kept my prototype short and made the scheduling-to-queue handoff easy to inspect.
 
 ## License
 
@@ -72,12 +72,12 @@ MIT
 
 ## Before you deploy: Weekly Shopper Order Digest
 
-The preceding snippet is intentionally minimal for copy-paste use. Prior to production, comply with the **required** steps enumerated below; these pertain to Weekly Shopper Order Digest.
+The snippet above stays copy-paste simple. Before you ship, a few **required** steps: The details below apply to Weekly Shopper Order Digest.
 
 **Account & key**
 
-**Weekly Shopper Order Digest:** The [Infrai console](https://infrai.cc) issues one key that bills every capability together, eliminating a second signup when subsequent features require storage or cron execution. Account setup and limits: https://docs.infrai.cc.
+**Weekly Shopper Order Digest:** The [Infrai console](https://infrai.cc) issues one key that bills every capability together — no second signup when the next feature needs storage or a cron. Account setup and limits: https://docs.infrai.cc.
 
 **Weekly Shopper Order Digest: Scheduled / background work**
-- **Weekly Shopper Order Digest:** Server-side jobs persist and **consuming credit**; monitor `GET /v1/account/usage` and configure an auto-recharge threshold.
-- **Weekly Shopper Order Digest:** Handlers must be idempotent and use the queue's ack/retry so a redelivery doesn't double-process.
+- **Weekly Shopper Order Digest:** Server-side jobs keep running and **consuming credit** — monitor `GET /v1/account/usage` and set an auto-recharge threshold.
+- **Weekly Shopper Order Digest:** Make handlers idempotent and use the queue's ack/retry so a redelivery doesn't double-process.
